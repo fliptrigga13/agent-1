@@ -80,12 +80,12 @@ def db():
     c.execute("CREATE TABLE IF NOT EXISTS log (t TEXT, role TEXT, text TEXT)")
     return c
 
-def mem_save(k, v):
-    c = db(); c.execute("REPLACE INTO facts VALUES (?,?,?)", (k, v, datetime.now().isoformat())); c.commit(); c.close()
-    return {"saved": k}
+def mem_save(key, value):
+    c = db(); c.execute("REPLACE INTO facts VALUES (?,?,?)", (key, value, datetime.now().isoformat())); c.commit(); c.close()
+    return {"saved": key}
 
-def mem_get(k):
-    c = db(); r = c.execute("SELECT v FROM facts WHERE k=?", (k,)).fetchone(); c.close()
+def mem_get(key):
+    c = db(); r = c.execute("SELECT v FROM facts WHERE k=?", (key,)).fetchone(); c.close()
     return {"value": r[0] if r else None}
 
 def mem_all():
