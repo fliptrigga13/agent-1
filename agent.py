@@ -39,7 +39,7 @@ DB = os.path.join(WORKDIR, "memory.db")
 WEB_PORT = int(os.environ.get("WEB_PORT", "8443"))
 TLS_CERT = os.environ.get("TLS_CERT", "")
 TLS_KEY = os.environ.get("TLS_KEY", "")
-MAX_STEPS = 10
+MAX_STEPS = 25
 
 TELEGRAM_ON = bool(TG_TOKEN and not TG_TOKEN.startswith("PASTE") and OWNER_ID)
 
@@ -151,13 +151,14 @@ TOOLS = [
 ]
 
 # ---------------- gemini ----------------
-def gemini(contents):
+def gemini(contents, use_tools=True):
     body = {
         "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": contents,
-        "tools": [{"function_declarations": TOOLS}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048},
     }
+    if use_tools:
+        body["tools"] = [{"function_declarations": TOOLS}]
     req = urllib.request.Request(API + "?key=" + GEMINI_KEY,
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
@@ -192,7 +193,17 @@ def run_turn(user_text):
                 out = {"error": str(e)}
             fparts.append({"functionResponse": {"name": name, "response": out}})
         contents.append({"role": "user", "parts": fparts})
-    return "Stopped after max steps."
+    # Step budget exhausted: ask for a clean summary with no further tool calls.
+    contents.append({"role": "user", "parts": [{"text":
+        "You have reached the step limit. Reply to the user now with a brief "
+        "summary of what you did and the outcome. No more tool calls."}]})
+    try:
+        res = gemini(contents, use_tools=False)
+        parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        texts = [p["text"] for p in parts if "text" in p]
+        return " ".join(texts).strip() or "(task ran long; no summary produced)"
+    except Exception as e:
+        return f"Task ran long and I could not summarize: {e}"
 
 # ---------------- telegram (optional) ----------------
 def tg(method, payload=None):
